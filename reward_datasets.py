@@ -136,7 +136,7 @@ def prepare_data_item(item, tokenizer=None, padding=False, max_response_num=1):
     score_idx = np.argsort(new_item['score'])
     max_score = max(new_item['score']) + 1e-5
     
-    new_item['score'] = [new_item['score'][s_i] / max_score for s_i in score_idx[::-1]]
+    new_item['score'] = [new_item['score'][s_i] / max_score for s_i in score_idx[::-1]] # normalize the scores
     new_item['text'] = [new_item['text'][s_i] for s_i in score_idx[::-1]]
 
     if padding:

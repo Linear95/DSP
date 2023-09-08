@@ -16,7 +16,7 @@ export PYTHONPATH=${REPO_DIR}
 
 
 DOMAIN='general'
-# normal entertainment scientific literary business
+# can be selected from [general, normal, academy, business, entertainment, literature]
 
 # model config
 #---------------------------------------------------------------------------------
@@ -29,89 +29,52 @@ if [[ "${DOMAIN}" = "general" ]]; then
 
    #-------------------------------------------------------
 else
-   MODEL_NAME=llama_4train
-   MODEL_PATH=${MODEL_DIR}/experiments/RM_domain_general_${MODEL_NAME}
-
+   MODEL_NAME=<general_rm_ckpt_name>
+   MODEL_PATH=${MODEL_DIR}/experiments/${MODEL_NAME}
 fi
 
 # data config
 #---------------------------------------------------------------------------------
-DATA_DIR=${WORKSPACE}/datasets/cleaned_data
-
-DOMAIN='business'
-# normal entertainment scientific literary business
+DATA_DIR=${REPO_DIR}/data
 
 if [[ "${DOMAIN}" = "general" ]]; then
 
-    TRAIN_DATA_LIST="${DATA_DIR}/helpful.train.json \
-                 ${DATA_DIR}/harmless.train.json \
-                 ${DATA_DIR}/webgpt.train.json \
-                 ${DATA_DIR}/gpt4llm.train.json"
 
     TEST_DATA_LIST="${DATA_DIR}/helpful.test.json \
                  ${DATA_DIR}/harmless.test.json \
                  ${DATA_DIR}/webgpt.test.json \
                  ${DATA_DIR}/gpt4llm.test.json"
-
+    
+    #--------------------------------------------------
+    TRAIN_DATA_LIST="${DATA_DIR}/helpful.train.json \
+                 ${DATA_DIR}/harmless.train.json \
+                 ${DATA_DIR}/webgpt.train.json \
+                 ${DATA_DIR}/gpt4llm.train.json"
     DATA_NAME=4train_data
 
     #--------------------------------------------------
     TRAIN_DATA_LIST="${DATA_DIR}/helpful.train.json \
                  ${DATA_DIR}/harmless.train.json"
-
-    TEST_DATA_LIST="${DATA_DIR}/helpful.test.json \
-                 ${DATA_DIR}/harmless.test.json \
-                 ${DATA_DIR}/webgpt.test.json \
-                 ${DATA_DIR}/gpt4llm.test.json"
-
     DATA_NAME=HH_train_data
-    #--------------------------------------------------
 else
-    # TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}.train.json"
-    # TEST_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}.test.json \
-    #              ${DATA_DIR}/helpful.test.json \
-    #              ${DATA_DIR}/harmless.test.json \
-    #              ${DATA_DIR}/webgpt.test.json \
-    #              ${DATA_DIR}/gpt4llm.test.json"
-
-    # DATA_NAME="ds_${DOMAIN}"
     TEST_DATA_LIST="${DATA_DIR}/helpful.test.json \
                  ${DATA_DIR}/harmless.test.json \
                  ${DATA_DIR}/webgpt.test.json \
                  ${DATA_DIR}/gpt4llm.test.json \
                  ${DATA_DIR}/dsp_${DOMAIN}_pair.test.json"
     
-
-    #--------------------------------------------------
     TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}_pair.train.json"
-    DATA_NAME="ds_${DOMAIN}_pair"
-
-    #--------------------------------------------------
-    TRAIN_DATA_LIST="${DATA_DIR}/helpful.train.json \
-                 ${DATA_DIR}/harmless.train.json \
-		 ${DATA_DIR}/dsp_${DOMAIN}_pair.train.json"
-    
-    DATA_NAME="ds_HH_${DOMAIN}_pair"
+    DATA_NAME="ds_${DOMAIN}_pair"   
 fi
-
-
-DOMAIN="general"
-
-# #DATA_NAME=harmless
-DATA_PREFIX=${DATA_DIR}/${DATA_NAME}
 
 # training setups
 #---------------------------------------------------------------------------------
 DEBUG=false
 RESUME_TRAINING=false
 
-
-MAX_RESPONSE_NUM=5
-
 LM_COEFF=0.1
 
 LEARNING_RATE=1e-6
-#MAX_TRAIN_STEPS=100
 WARMUP_STEPS=100
 LOGGING_STEPS=1
 EVAL_STEPS=100
@@ -120,7 +83,6 @@ SAVE_TOTAL_LIMIT=30
 MAX_TRAIN_STEPS=-1
 
 if [[ "${DEBUG}" = true ]]; then
-#    DOMAIN="general"
     EVAL_STEPS=10
     SAVE_STEPS=1
     SAVE_TOTAL_LIMIT=2
@@ -177,17 +139,14 @@ DEEPSPEED=${REPO_DIR}/configs/default_offload_opt_param.json
 
 echo "begin experiment ${EXPERIMENT_NAME}"
 
-
 wandb disabled
-#export CMD="deepspeed --hostfile ${TMP_DIR}/hostfile --master_addr ${MASTER_ADDR} --master_port=${MASTER_PORT} ${REPO_DIR}/train.py \
-#    --resume_from_checkpoint ${RESUME_FROM_CHECKPOINT} \
+
 export CMD="torchrun --nproc_per_node=${NUM_GPUS} --master_port=${MASTER_PORT} ${REPO_DIR}/train.py \
     --do_train True \
     --eval_at_start True\
     --model_type llama \
     --lm_loss_coeff ${LM_COEFF} \
     --model_name_or_path ${MODEL_PATH} \
-    --data_prefix ${DATA_PREFIX} \
     --data_dir ${DATA_DIR} \
     --train_data_path ${TRAIN_DATA_LIST} \
     --eval_data_path ${TEST_DATA_LIST} \
@@ -216,7 +175,6 @@ export CMD="torchrun --nproc_per_node=${NUM_GPUS} --master_port=${MASTER_PORT} $
     --weight_decay 0. \
     --deepspeed ${DEEPSPEED} \
     --tf32 false --debug_mode ${DEBUG}"
-
 
 CURRENT_TIME=$(date +'%m-%d_%T')
 
