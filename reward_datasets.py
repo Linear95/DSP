@@ -3,6 +3,7 @@ from tqdm import tqdm
 import gzip
 import random
 from copy import deepcopy
+import argparse
 
 from utils import print_rank_0
 from pprint import pprint
@@ -10,11 +11,6 @@ import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-
-from transformers import LlamaTokenizer
-
-from datasets import load_dataset
-
 
 QUERY_PROMPT="## Human:\n{request}\n\n## Assistant:\n{response}"
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -34,8 +30,8 @@ def get_data_iter(data_list, debug=False):
         return data_list
 
 
-def load_domain_specific_reward_data(data_path, tokenizer=None, domain="normal", padding=False, debug=False):
-    print_rank_0("begin preparing domain specialized reward data for training...")
+def convert_domain_specific_reward_data(data_path, tokenizer=None, domain="normal", padding=False, debug=False, to_pairs=True):
+    print_rank_0(f"begin preparing domain-specific preference data from responses at {data_path}")
 
     if data_path[-4:] == 'json':
         data_list = load_json_data(data_path)
@@ -46,18 +42,34 @@ def load_domain_specific_reward_data(data_path, tokenizer=None, domain="normal",
     for item in get_data_iter(data_list, debug=debug):
         data_point = {"text": [], "score": []}
         query = item['query']
-        if domain not in item['answers']:
+        if domain not in item['responses']:
             raise ValueError("Unknown domain {}.".format(domain))
+            
+        if not to_pairs:
+            for style, text in item['responses'].items():
+                data_point['text'].append(QUERY_PROMPT.format(request=query, response=text))
+                data_point['score'].append(float(style == domain))
 
-        for style, text in item['answers'].items():
-            data_point['text'].append(QUERY_PROMPT.format(request=query, response=text))
-            data_point['score'].append(float(style == domain))
+            new_item = prepare_data_item(data_point, tokenizer=tokenizer, padding=padding)
+            if new_item is not None:
+                outputs.append(new_item)
+        else:
+            preferred_response = item['responses'][domain]
+            for style, text in item['responses'].items():
+                if style == domain:
+                    continue
+                data_point = {}
+                data_point['text'] = [
+                    QUERY_PROMPT.format(request=query, response=preferred_response), 
+                    QUERY_PROMPT.format(request=query, response=text),
+                ]
+                data_point['score'] = [1., 0.]
 
-        new_item = prepare_data_item(data_point, tokenizer=tokenizer, padding=padding)
-        if new_item is not None:
-            outputs.append(new_item)
+                new_item = prepare_data_item(data_point, tokenizer=tokenizer, padding=padding)
+                if new_item is not None:
+                    outputs.append(new_item)
 
-    print_rank_0("finished processing {} domain specialized reward data.".format(len(outputs)))
+    print_rank_0("finished processing {} domain-specific preference data.".format(len(outputs)))
     return outputs
 
 
@@ -222,4 +234,22 @@ def get_reward_data(data_path):
 
     return data
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description ='parser for preference data processing.')
+    parser.add_argument("--input_data_path", type=str, default="", help="the path to input data.")
+    parser.add_argument("--output_data_path", type=str, default="", help="the path to output data.")
 
+    parser.add_argument("--domain", type=str, default="general", help="the domain of the preference data, selected from [general, normal, academy, business, entertainment, literature].")
+
+    parser.add_argument("--convert", action='store_true', help="whether convert responses into the preference text-score format.")
+    parser.add_argument("--to_pairs", action='store_true', help="whether convert responses into pair comparisons.")
+    
+    args = parser.parse_args()
+    print(args)
+
+    if args.convert:
+        dsp_rm_data = convert_domain_specific_reward_data(data_path=args.input_data_path, domain=args.domain, to_pairs=args.to_pairs)
+        with open(args.output_data_path, 'w') as f:
+            json.dump(dsp_rm_data, f, ensure_ascii=False)
+
+    
