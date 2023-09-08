@@ -6,10 +6,10 @@
 This is the repo for paper 
 [Everyone Deserves A Reward: Learning Customized Human Preferences](https://arxiv.org/abs/2309.03126), 
 which contains:
-- the [Domain-Specific Preference](data/) (DSP) dataset
+- the [Domain-Specific Preference](data/) (DSP) dataset,
 - the cleaned general preference datasets including [Helpful&Harmless](https://github.com/anthropics/hh-rlhf/tree/master), [WebGPT](https://huggingface.co/datasets/openai/webgpt_comparisons), and
-[GPT-4-LLM](https://github.com/Instruction-Tuning-with-GPT-4/GPT-4-LLM/tree/main/data)
-- the implementation of customized reward model learning
+[GPT-4-LLM](https://github.com/Instruction-Tuning-with-GPT-4/GPT-4-LLM/tree/main/data),
+- the implementation of customized reward model learning.
 
 ## Overview
 
@@ -30,35 +30,35 @@ with domain-specific system prompts to collect preferred responses from each dom
   <img src="figures/DSP_data_collection.png" height="80%" width="80%">
 </p>
 
-The collected data are  `data/domain_specific_preference.train.json` and `data/domain_specific_preference.test.json`, which are list of items including the following keys:
-- `query`: A question collected from the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca) training set.
-- `responses`: A collection of responses from the four application domains (`academy`, `business`, `entertainment`, `literature`) additionally with the origin response from Alpaca (marked as `normal`).
+The collected data are  `data/domain_specific_preference.train.json` and `data/domain_specific_preference.test.json`, which are lists of items including the following keys:
+- `query`: a question collected from the [Alpaca](https://github.com/tatsu-lab/stanford_alpaca) training set,
+- `responses`: a collection of responses from the four application domains (`academy`, `business`, `entertainment`, `literature`) additionally with the origin response from Alpaca (marked as `normal`).
 
 To convert the collected responses into a preference data format, use the following command:
 ```bash
 DOMAIN="academy"
 DATA_TYPE="train"
 
-python reward_datasets.py \
+python3 reward_datasets.py \
        --input_data_path data/domain_specific_preference.${DATA_TYPE}.json \
        --domain ${DOMAIN} \
        --output_data_path data/dsp_${DOMAIN}_pairs.${DATA_TYPE}.json \
        --convert --to_pairs
 ```
 where `DOMAIN` can be changed to the other four domains, and `DATA_TYPE` is set from `train` and `test`.
-After the conversion, the preference data has a `text`-`score` format that each item contrains two keys:
-- `text`: a list of text, each of which combines the query and a response as a complete human-assistant interation.
-- `score`: a list of scores, each of which is a preference score to the corresponding interation.
+After the conversion, the preference data has a `text`-`score` format, where each item contains two keys:
+- `text`: a list of text, each of which combines the query and one response as a complete human-assistant interaction,
+- `score`: a list of scores, each of which is a preference score to the corresponding interaction.
 
 Besides, we also cleaned the general preference comparisons from [Helpful&Harmless](https://github.com/anthropics/hh-rlhf/tree/master), [WebGPT](https://huggingface.co/datasets/openai/webgpt_comparisons), and
 [GPT-4-LLM](https://github.com/Instruction-Tuning-with-GPT-4/GPT-4-LLM/tree/main/data) datasets and convert them into the same `text`-`score` format.
 
 ## Customized RM training
 <p align="center">
-  <img src="figures/learning_stages_customized_rm.png" height="55%" width="55%">
+  <img src="figures/learning_stages_customized_rm.png" height="60%" width="60%">
 </p>
 
-To learn customized human preferences, we design a three-stage RM training scheme as shown in the figure above. For base LM training, we directly use the pretrained LLMs including [LLaMA-7B](https://huggingface.co/decapoda-research/llama-7b-hf) and [Alpaca-7B](https://huggingface.co/chavinlo/alpaca-native). To reproduce our results on general RM fine-tuning (GRFT) and customized RM fine-tuning (CRFT), first install the dependenies with `Python3.8`:
+To learn customized human preferences, we design a three-stage RM training scheme as shown in the figure above. For base LM training, we directly use the pretrained LLMs including [LLaMA-7B](https://huggingface.co/decapoda-research/llama-7b-hf) and [Alpaca-7B](https://huggingface.co/chavinlo/alpaca-native). To reproduce our results on general RM fine-tuning (GRFT) and customized RM fine-tuning (CRFT), first install the dependencies with `Python3.8`:
 ```bash
 pip3 install -r requirements.txt
 ```
