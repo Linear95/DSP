@@ -108,12 +108,12 @@ For customized RM fine-tuning, use the following command:
 ```bash
 DOMAIN="academy"
 DATA_DIR="data"
-TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}_pair.train.json"
+TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}_pairs.train.json"
 TEST_DATA_LIST="${DATA_DIR}/helpful.test.json \
                  ${DATA_DIR}/harmless.test.json \
                  ${DATA_DIR}/webgpt.test.json \
                  ${DATA_DIR}/gpt4llm.test.json \
-                 ${DATA_DIR}/dsp_${DOMAIN}_pair.test.json"
+                 ${DATA_DIR}/dsp_${DOMAIN}_pairs.test.json"
 LM_COEFF=0.
 
 torchrun --nproc_per_node=8 --master_port=6000 train.py \

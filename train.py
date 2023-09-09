@@ -26,19 +26,6 @@ DEFAULT_BOS_TOKEN = "<s>"
 DEFAULT_UNK_TOKEN = "<unk>"
 
 
-def smart_tokenizer_and_embedding_resize(
-    special_tokens_dict: Dict,
-    tokenizer: transformers.PreTrainedTokenizer,
-    model: transformers.PreTrainedModel,
-):
-    """Resize tokenizer and embedding.
-
-    Note: This is the unoptimized version that may make your embedding size not be divisible by 64.
-    """
-    num_new_tokens = tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
-
-
 def get_eval_datasets(args, tokenizer):
     
     data_dict = {}
@@ -58,19 +45,16 @@ def get_eval_datasets(args, tokenizer):
 def get_train_dataset(args, tokenizer):    
     all_train_data = []
     for train_data_path in args.train_data_path:
-
         train_data = load_text_score_dataset(
             data_path=train_data_path,
             tokenizer=tokenizer, 
             debug=args.debug_mode,
             padding=not args.per_device_train_batch_size == 1
         )
-
         all_train_data.extend(train_data)
 
     # if args.debug_mode:
-    print_rank_0(f">>> check tokenized data:")
-        
+    print_rank_0(f">>> check tokenized data:")        
     print_rank_0(f">>> {all_train_data[0]}")
 
     train_set = TextRewardDataset(all_train_data)
@@ -78,12 +62,10 @@ def get_train_dataset(args, tokenizer):
 
 
 def set_llama_tokenizer(model, tokenizer):
-
     tokenizer.pad_token_id = 3
     tokenizer.bos_token_id = 1
     tokenizer.eos_token_id = 2
     tokenizer.unk_token_id = 0
-
     model.config.pad_token_id = tokenizer.pad_token_id
     model.config.bos_token_id = tokenizer.bos_token_id
     model.config.eos_token_id = tokenizer.eos_token_id
@@ -129,19 +111,16 @@ def train():
         use_fast=False,
     )
 
-    
     if args.model_type != "bert":
         model, tokenizer = set_llama_tokenizer(model=model, tokenizer=tokenizer)
         print_rank_0(f"check tokenizer length {len(tokenizer)}")
 
     # load data
-    #---------------------------------------------------------------------------------
-    
+    #---------------------------------------------------------------------------------    
     if args.do_train:
         train_dataset = get_train_dataset(args, tokenizer)
     else:
         train_dataset = None
-
     eval_dataset_dict = get_eval_datasets(args, tokenizer)
 
     # build trainer
@@ -163,7 +142,6 @@ def train():
                 eval_result = trainer.evaluate(eval_dataset=eval_dataset, metric_key_prefix="eval_"+eval_set_name)
                 print_rank_0(eval_result)
 
-
         with torch.autocast("cuda"): 
             if args.resume_from_checkpoint:
                 train_result = trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
@@ -177,7 +155,6 @@ def train():
         trainer.save_state()
         trainer.save_model(output_dir=args.output_dir)
 
-
     final_eval_results ={}
     for eval_set_name, eval_dataset in eval_dataset_dict.items():
         eval_result = trainer.evaluate(eval_dataset=eval_dataset, metric_key_prefix="eval_"+eval_set_name)
@@ -186,8 +163,6 @@ def train():
 
     with open(f"{args.output_dir}/final_eval_results.json", 'w') as f:
         json.dump(final_eval_results, f, ensure_ascii=False)
-
-
 
 if __name__ == "__main__":
     train()

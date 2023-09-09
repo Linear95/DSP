@@ -61,10 +61,10 @@ else
                  ${DATA_DIR}/harmless.test.json \
                  ${DATA_DIR}/webgpt.test.json \
                  ${DATA_DIR}/gpt4llm.test.json \
-                 ${DATA_DIR}/dsp_${DOMAIN}_pair.test.json"
+                 ${DATA_DIR}/dsp_${DOMAIN}_pairs.test.json"
     
-    TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}_pair.train.json"
-    DATA_NAME="ds_${DOMAIN}_pair"   
+    TRAIN_DATA_LIST="${DATA_DIR}/dsp_${DOMAIN}_pairs.train.json"
+    DATA_NAME="ds_${DOMAIN}_pairs"   
 fi
 
 # training setups
@@ -121,7 +121,7 @@ POOLING_TYPE="last"
 
 # output config
 #----------------------------------------------------------------------------------
-EXPERIMENT_NAME=RM_${MODEL_NAME}_domain_${DOMAIN}_data_${DATA_NAME}_bs_${BATCH_SIZE}_maxlen_${MAX_LENGTH}_pad_${PADDING_SIDE}_truc_${TRUNCATION_SIDE}_pool_${POOLING_TYPE}_step_w${WARMUP_STEPS}_e${EVAL_STEPS}_rl${LEARNING_RATE}_lm${LM_COEFF}_debug_${DEBUG}_$(date +'%m-%d')
+EXPERIMENT_NAME=RM_${MODEL_NAME}_domain_${DOMAIN}_${DATA_NAME}_bs_${BATCH_SIZE}_maxlen_${MAX_LENGTH}_pad_${PADDING_SIDE}_truc_${TRUNCATION_SIDE}_pool_${POOLING_TYPE}_lm${LM_COEFF}_debug_${DEBUG}_$(date +'%m-%d')
 
 
 SAVE_DIR=${WORKSPACE}/outputs

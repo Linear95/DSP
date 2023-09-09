@@ -82,9 +82,6 @@ class LlamaRewardModel(LlamaPreTrainedModel):
         if attention_mask is None:
             attention_mask = torch.ne(input_ids, self.config.pad_token_id).float()
 
-        # print("hidden_states shape {}".format(hidden_states.shape))
-        # print("attention_mask shape {}".format(attention_mask.shape))
-
         attention_mask_ext = attention_mask.unsqueeze(-1)
         if pooling_type in ["last", "eos"]:
             offset = 1 if pooling_type == "eos" else 2
@@ -100,9 +97,7 @@ class LlamaRewardModel(LlamaPreTrainedModel):
         else:
             raise ValueError("The pooling method {} is not implemented!!".format(pooling_type))
 
-        pooled_logits = self.reward_head(pooled_hidden_state)
-        
-        #pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_lengths]
+        pooled_logits = self.reward_head(pooled_hidden_state)        
 
         return {
             "lm_logits": lm_logits,
@@ -144,9 +139,6 @@ class BertRewardModel(BertPreTrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        # print("debug inputs", input_ids.shape)
-        # print("debug attention", attention_mask.shape)
-
         transformer_outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -178,9 +170,6 @@ class BertRewardModel(BertPreTrainedModel):
         if attention_mask is None:
             attention_mask = torch.ne(input_ids, self.config.pad_token_id).float()
 
-        # print("hidden_states shape {}".format(hidden_states.shape))
-        # print("attention_mask shape {}".format(attention_mask.shape))
-
         attention_mask_ext = attention_mask.unsqueeze(-1)
         if pooling_type == "last":
             if padding_side == "right":
@@ -197,7 +186,6 @@ class BertRewardModel(BertPreTrainedModel):
 
         pooled_logits = self.reward_head(pooled_hidden_state)
         
-        #pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_lengths]
 
         loss = None
         if labels is not None:

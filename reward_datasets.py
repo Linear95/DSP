@@ -144,12 +144,6 @@ def prepare_data_item(item, tokenizer=None, padding=False, max_response_num=1):
         new_item['score'] += [-1.] * (max_response_num - len(new_item['score']))        
 
     if tokenizer is not None:
-        # new_item['tokens'] = tokenizer(
-        #     new_item['text'],
-        #     padding="max_length" if padding else "longest",
-        #     max_length=tokenizer.model_max_length,
-        #     truncation=True
-        # )
         new_item['tokens'] = reward_tokenize(
             sentences=new_item['text'],
             tokenizer=tokenizer,

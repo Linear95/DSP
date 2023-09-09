@@ -11,6 +11,6 @@ do
 python ${REPO_DIR}/reward_datasets.py \
     --input_data_path ${REPO_DIR}/data/domain_specific_preference.${DATA_TYPE}.json \
     --domain ${DOMAIN} \
-    --output_data_path data/dsp_${DOMAIN}_pair.${DATA_TYPE}.json \
+    --output_data_path data/dsp_${DOMAIN}_pairs.${DATA_TYPE}.json \
     --convert --to_pairs
 done

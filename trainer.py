@@ -8,7 +8,6 @@ import torch.distributed as dist
 import torch.nn.functional as F
 import transformers
 
-
 from transformers import Trainer, AutoConfig
 from transformers import EvalPrediction
 
@@ -19,12 +18,6 @@ def compute_metrics(prediction: EvalPrediction):
     logits = torch.from_numpy(prediction.predictions)
     scores = torch.from_numpy(prediction.label_ids)
     
-    # logits = logits[:10]
-    # scores = scores[:10]
-    # print_rank_0(f">> check eval_prediction inputs...")
-    # print_rank_0(f">>> logits: {logits}")
-    # print_rank_0(f">>> scores: {scores}")
-
     logits_diff = logits.unsqueeze(1) - logits.unsqueeze(2)  # [batch_size, num_sample, num_sample]
 
     score_mask_larger = (scores.unsqueeze(1) > scores.unsqueeze(2)) * 1.
@@ -32,37 +25,19 @@ def compute_metrics(prediction: EvalPrediction):
     score_mask = score_mask_larger - score_mask_smaller
     pad_mask = (scores >= 0).unsqueeze(1) * 1. * (scores >= 0).unsqueeze(2)
 
-
     # calculate accuracy...
     pred_compare = (logits_diff.detach() > 0.) * 1.
     total_mask = (score_mask_larger + score_mask_smaller) * pad_mask
     correct_compare = (pred_compare == score_mask_larger) * total_mask
-
-    # print_rank_0(f">> check middel results ...")
-    # print_rank_0(f">>> pred_compare: {pred_compare}")
-    # print_rank_0(f">>> score_mask_larger: {score_mask_larger}")
-
-
-    # correct = correct_compare.sum()
-    # total = total_mask.sum()
+    
     all_acc = correct_compare.sum() / total_mask.sum()
     first_two_acc =  (correct_compare[:, 0, 1]).sum() / (total_mask[:, 0, 1]).sum() 
     
-    # print_rank_0(f">> check eval_prediction outputs...")
-    # print_rank_0(f">>> correct_compare: {correct_compare}")
-    # print_rank_0(f">>> total_mask: {total_mask}")
-    # print_rank_0(f">>> all_acc: {all_acc}")
-    # print_rank_0(f">>> first_two_acc: {first_two_acc}")
-
     return {"Preference total Acc": all_acc.item(), "First-two Acc": first_two_acc.item()}
 
 
 
 def language_modeling_loss(lm_logits, input_ids, scores, loss_mask, score_thresh=0.9, eps=1e-7): 
-    # select best response for language modeling
-    # print_rank_0(f"lm_logits {lm_logits.shape}")
-    # print_rank_0(f"input_ids {input_ids.shape}")
-    # print_rank_0(f"loss_mask {loss_mask.shape}")
     batch_size, seq_length, vocab_size = lm_logits.shape
     
     lm_probs = torch.nn.functional.cross_entropy(
@@ -94,7 +69,6 @@ def ranking_loss(logits, scores): # with shape [bs, r]
     return  total_loss / total_pairs  if total_pairs > 0 else total_loss
 
 
-
 def gather_all_with_local_grad(tensor, dim=0):
     local_rank = torch.distributed.get_rank()
 
@@ -106,7 +80,6 @@ def gather_all_with_local_grad(tensor, dim=0):
     return torch.stack(all_tensors, dim=dim)
     
 
-
 class RewardModelTrainer(Trainer):
     def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys: Optional[List[str]] = None):
         device = model.device
@@ -115,7 +88,6 @@ class RewardModelTrainer(Trainer):
         with torch.no_grad():
             loss, logits = self.compute_loss(model, inputs, return_outputs=True)
             loss = loss.mean().detach()
-            # logits = outputs.logits
 
         if prediction_loss_only:
             return (loss, None, None)
@@ -159,14 +131,7 @@ class RewardModelTrainer(Trainer):
 
         if self.args.debug_mode:
             print_rank_0(f">>> debug")
-            # print_rank_0(f">>> input_ids shape {input_ids.shape}")
-            # # print_rank_0(f">>> loss {loss}, correct {correct}, total {total_pairs}, acc {accuracy}.")
-            # print_rank_0(f">>> outputs.logits {outputs.logits}")
-            # print_rank_0(f">>> logits_diff {logits_diff}")
-            # print_rank_0(f">>> log_prob {log_prob}")
             print_rank_0(f">>> Language modeling loss {lm_loss}")
             print_rank_0(f">>> Ranking loss {rm_loss}")
-            # print_rank_0(f">>> correct {correct} \n>>> total {total_pairs}")
-            # print_rank_0(f">>> total mask {total_mask}")
         
         return (total_loss, batch_logits) if return_outputs else total_loss            
