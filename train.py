@@ -43,21 +43,18 @@ def get_eval_datasets(args, tokenizer):
     return data_dict
 
 def get_train_dataset(args, tokenizer):    
-    all_train_data = []
-    for train_data_path in args.train_data_path:
-        train_data = load_text_score_dataset(
-            data_path=train_data_path,
-            tokenizer=tokenizer, 
-            debug=args.debug_mode,
-            padding=not args.per_device_train_batch_size == 1
-        )
-        all_train_data.extend(train_data)
+    train_data = load_text_score_dataset(
+        data_path=args.train_data_path,
+        tokenizer=tokenizer, 
+        debug=args.debug_mode,
+        padding=not args.per_device_train_batch_size == 1
+    )
 
     # if args.debug_mode:
     print_rank_0(f">>> check tokenized data:")        
-    print_rank_0(f">>> {all_train_data[0]}")
+    print_rank_0(f">>> {train_data[0]}")
 
-    train_set = TextRewardDataset(all_train_data)
+    train_set = TextRewardDataset(train_data)
     return train_set
 
 
@@ -130,7 +127,7 @@ def train():
         model=model, 
         tokenizer=tokenizer, 
         args=args,
-        compute_metrics=compute_metrics,
+        compute_metrics=lambda x: compute_metrics(args, x),
         train_dataset=train_dataset,
         eval_dataset=eval_dataset_dict,
         data_collator=reward_data_collactor

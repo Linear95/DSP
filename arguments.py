@@ -145,3 +145,8 @@ class CustomTrainingArguments(TrainingArguments):
         metadata={"help": "target modules for lora optimization."}
     )
 
+    rm_calibration: bool = field(default=True)
+
+    calibration_bins: List[int] = field(
+        default_factory=lambda: [10, 15]
+    )

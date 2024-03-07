@@ -7,6 +7,7 @@ import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 import transformers
+import numpy as np
 
 from transformers import Trainer, AutoConfig
 from transformers import EvalPrediction
@@ -14,26 +15,102 @@ from transformers import EvalPrediction
 from utils import print_rank_0
 
 
-def compute_metrics(prediction: EvalPrediction):
-    logits = torch.from_numpy(prediction.predictions)
-    scores = torch.from_numpy(prediction.label_ids)
+def compute_ece(y_true, y_prob, n_bins=5, strategy="uniform"):
+    if len(y_true) == 0:
+        return 0., 0., 0.
     
-    logits_diff = logits.unsqueeze(1) - logits.unsqueeze(2)  # [batch_size, num_sample, num_sample]
+    if strategy == "quantile":
+        quantiles = np.linspace(0., 1., n_bins + 1)
+        bins = np.percentile(y_prob, quantiles * 100)
+    elif strategy == "uniform":
+        bins = np.linspace(0., 1., n_bins+1)
+    else:
+        raise ValueError(
+            "Invalid entry to 'strategy' input. Strategy must be either 'quantile' or 'uniform'."
+        )
+    
+    # the ith element in binids indicate which bin the ith element in y_prob belong to.
+    binids = np.searchsorted(bins[1:-1], y_prob)
 
+    # the ith element in bin_sums is the average probability of positive examples that model predict in the ith bin
+    bin_sums = np.bincount(binids, weights=y_prob, minlength=len(bins))
+    # the ith element in bin_true is the real probablility of positive examples in the ith bin
+    bin_true = np.bincount(binids, weights=y_true, minlength=len(bins))
+    # the ith element in bin_total is the total num of examples belong to the ith bin
+    bin_total = np.bincount(binids, minlength=len(bins))
+
+    nonzero = bin_total != 0
+
+    try:
+        expected_error = np.abs(bin_sums - bin_true).sum() / len(y_prob)
+        average_error = (np.abs(bin_sums[nonzero] - bin_true[nonzero]) / bin_total[nonzero]).mean()
+        max_error = (np.abs(bin_sums[nonzero] - bin_true[nonzero]) / bin_total[nonzero]).max()
+    except:
+        expected_error, average_error, max_error = 0., 0., 0.
+    return expected_error, average_error, max_error
+
+def rm_calibration_errors(args, labels: torch.Tensor, probs: torch.Tensor, masks: torch.Tensor, num_bins):
+    label_list = labels.reshape(-1).tolist()
+    prob_list = probs.reshape(-1).tolist()
+    mask_list = masks.reshape(-1).tolist()
+
+    y_true, y_prob = [], []
+    for label, prob, mask in zip(label_list, prob_list, mask_list):
+        if mask:
+            y_true.append(label)
+            y_prob.append(prob)
+    
+    if args.debug_mode:
+        print_rank_0(f">>> Check calibration inputs mask filtered...")
+        print_rank_0(f">>>>>>>>> y_true: {y_true[:10]}")
+        print_rank_0(f">>>>>>>>> y_prob: {y_prob[:10]}")
+    
+    return compute_ece(np.array(y_true), np.array(y_prob), n_bins=num_bins)
+    
+
+def compute_metrics(args, predict: EvalPrediction):
+    logits = torch.from_numpy(predict.predictions) # (batch_size, num_sample)
+    scores = torch.from_numpy(predict.label_ids) # (batch_size, num_sample)
+
+    logits_diff = logits.unsqueeze(1) - logits.unsqueeze(2) # shape: (batch_size, num_sample, num_sample)
+    
     score_mask_larger = (scores.unsqueeze(1) > scores.unsqueeze(2)) * 1.
     score_mask_smaller = (scores.unsqueeze(1) < scores.unsqueeze(2)) * 1.
     score_mask = score_mask_larger - score_mask_smaller
     pad_mask = (scores >= 0).unsqueeze(1) * 1. * (scores >= 0).unsqueeze(2)
 
-    # calculate accuracy...
-    pred_compare = (logits_diff.detach() > 0.) * 1.
+    # caculate accuracy
+    pred_compare = ((logits_diff * score_mask).detach() > 0.) * 1.
     total_mask = (score_mask_larger + score_mask_smaller) * pad_mask
-    correct_compare = (pred_compare == score_mask_larger) * total_mask
-    
+    correct_compare = pred_compare * total_mask
+
     all_acc = correct_compare.sum() / total_mask.sum()
-    first_two_acc =  (correct_compare[:, 0, 1]).sum() / (total_mask[:, 0, 1]).sum() 
+    first_two_acc = (correct_compare[:, 0, 1]).sum() / (total_mask[:, 0, 1]).sum()
+
+    # caculate ece
+    calibration_errors = {}
+    if args.rm_calibration:
+        for num_bins in args.calibration_bins:
+            expected_error, average_error, max_error = rm_calibration_errors(
+                args=args,
+                labels=score_mask_larger,
+                probs=F.sigmoid(logits_diff),
+                masks=total_mask,
+                num_bins=num_bins
+            )
+
+            calibration_errors[f"calibration_ECE_bin{num_bins}"] = expected_error
+            #calibration_errors[f"calibration_ACE_bin{num_bins}"] = average_error
+            #calibration_errors[f"calibration_MCE_bin{num_bins}"] = max_error
     
-    return {"Preference total Acc": all_acc.item(), "First-two Acc": first_two_acc.item()}
+    if args.debug_mode:
+        print_rank_0(f">>> Check eval_prediction outputs...")
+        print_rank_0(f">>> correct_compare: {correct_compare}")
+        print_rank_0(f">>> total_mask: {total_mask}")
+        print_rank_0(f">>> all_acc: {all_acc}")
+        print_rank_0(f">>> calibration error: {calibration_errors}")
+
+    return {"Preference total Acc": all_acc.item(), "First-two Acc": first_two_acc.item(), **calibration_errors}
 
 
 
